@@ -1,0 +1,6 @@
+n,k,rate,ell,nu,binary_rows,target_rank,source,instances,probability_deficiency_zero,probability_deficiency_at_most_log2_n,mean_deficiency,median_deficiency,p95_deficiency,p99_deficiency,max_deficiency,mean_matrix_deficiency,max_matrix_deficiency,mean_K_gain_deficiency,max_K_gain_deficiency
+24,8,0.3333333333333333,1,34,544,576,pkp_derived,100,1.0,1.0,0,0.0,0,0,0,0,0,0,0
+30,10,0.3333333333333333,1,43,860,900,pkp_derived,100,1.0,1.0,0,0.0,0,0,0,0,0,0,0
+36,12,0.3333333333333333,1,52,1248,1296,pkp_derived,100,1.0,1.0,0,0.0,0,0,0,0,0,0,0
+48,16,0.3333333333333333,1,70,2240,2304,pkp_derived,100,1.0,1.0,0,0.0,0,0,0,0,0,0,0
+60,20,0.3333333333333333,1,88,3520,3600,pkp_derived,100,1.0,1.0,0,0.0,0,0,0,0,0,0,0

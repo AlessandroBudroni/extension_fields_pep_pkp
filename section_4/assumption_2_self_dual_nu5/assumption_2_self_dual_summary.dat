@@ -1,0 +1,6 @@
+n k nu derived_mean derived_median derived_p95 derived_p99 derived_max
+20 10 5 0.03 0.0 0 1 1
+24 12 5 0.01 0.0 0 0 1
+32 16 5 0 0.0 0 0 0
+48 24 5 0 0.0 0 0 0
+64 32 5 0 0.0 0 0 0
