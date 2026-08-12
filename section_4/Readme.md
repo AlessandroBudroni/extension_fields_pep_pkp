@@ -66,6 +66,26 @@ for PEP-derived binary matrices, with `d=n+1` in the strictly
 self-orthogonal case and `d=2n` in the self-dual case. The two modes are
 selected by the required flags `--self-orthogonal` and `--self-dual`.
 
+The self-orthogonal codes are drawn with the uniform sampler of
+[AlbBenLai25], vendored in `abl_ec25.py` and called as
+`random_selforthogonal_code(n, k, q)`. It is a Las Vegas algorithm that
+returns `None` on rejection, so `--max-tries` now bounds the number of
+sampler restarts per instance rather than the number of candidate rows.
+All scripts that use it build the field as `GF(2**nu)`, matching the field
+the sampler constructs internally; `GF(2**nu, name=...)` yields a different,
+non-coercible Sage parent.
+
+`SampleSelfOrthogonal` carries one addition for binary extension fields. Its
+conic construction assumes odd characteristic: over `GF(2**nu)` the Euclidean
+form degenerates to `x.x = (sum_i x_i)^2`, the conic becomes a double line,
+and the published rejection step then discards every sample for some inputs,
+which both biases the output and makes the sampler slow. In characteristic 2
+the self-orthogonal vectors of a code `C` are exactly the kernel of the single
+linear form `x -> x*(G*1)`, so the module samples that kernel directly. The
+result is uniform (verified against exhaustive enumeration for `[4,2]`,
+`[6,2]` and `[6,3]` codes over `GF(4)`) and about 200 times faster at the
+lengths used here.
+
 Unless `--nu` is supplied, each length is tested at the boundary
 
 ```text

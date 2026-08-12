@@ -15,7 +15,17 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sage.all import GF, matrix, random_matrix, set_random_seed, vector, zero_matrix
+from sage.all import (
+    GF,
+    Integer,
+    matrix,
+    random_matrix,
+    set_random_seed,
+    vector,
+    zero_matrix,
+)
+
+from abl_ec25 import random_selforthogonal_code as random_selforthogonal_code_fe
 
 
 PASTEL_BLUE = "#6F9CC5"
@@ -37,44 +47,26 @@ def random_permutation_matrix(field, n):
     return value
 
 
-def random_vector_from_basis(field, basis):
-    value = vector(field, len(basis[0]))
-    for basis_vector in basis:
-        value += field.random_element() * basis_vector
-    return value
+def extension_field(nu):
+    """Return the field the sampler works over, so parents always match."""
+    return GF(Integer(2) ** Integer(nu))
 
 
 def random_self_orthogonal_generator(field, n, k, max_tries):
-    """Sample a generator of a self-orthogonal code."""
+    """Sample a uniformly random self-orthogonal code with the [AlbBenLai25] sampler."""
     if not 0 < k <= n // 2:
         raise ValueError("self-orthogonal codes require 0 < k <= n/2")
-    rows = []
-    ones = vector(field, [1] * n)
-    for dimension in range(k):
-        constraints = matrix(field, rows + [ones])
-        basis = list(constraints.right_kernel().basis())
-        found = False
-        for _ in range(max_tries):
-            candidate = random_vector_from_basis(field, basis)
-            if candidate == 0:
-                continue
-            if matrix(field, rows + [candidate]).rank() != dimension + 1:
-                continue
-            if any(candidate * previous != 0 for previous in rows):
-                continue
-            if candidate * candidate != 0:
-                continue
-            rows.append(candidate)
-            found = True
-            break
-        if not found:
-            raise RuntimeError(
-                f"failed to extend self-orthogonal generator after {max_tries} trials"
-            )
-    G = matrix(field, rows)
-    if G.rank() != k or G * G.transpose() != 0:
-        raise AssertionError("invalid self-orthogonal generator")
-    return G
+    for _ in range(max_tries):
+        # The sampler is Las Vegas: None signals a rejection, so restart it.
+        G = random_selforthogonal_code_fe(n, k, field.order())
+        if G is None:
+            continue
+        if G.rank() != k or G * G.transpose() != 0:
+            raise AssertionError("invalid self-orthogonal generator")
+        return G
+    raise RuntimeError(
+        f"failed to sample a self-orthogonal generator after {max_tries} trials"
+    )
 
 
 def sample_pep_instance(field, n, k, max_tries):
@@ -168,7 +160,7 @@ def run_parameter_set(task):
     case, n, k, nu, instances, seed, max_tries = task
     random.seed(seed)
     set_random_seed(seed)
-    field = GF(2**nu, name=f"z{nu}")
+    field = extension_field(nu)
     d = n + 1 if case == "self_orthogonal" else 2 * n
     records = []
     for instance in range(instances):

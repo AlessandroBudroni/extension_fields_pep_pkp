@@ -21,6 +21,7 @@ from polynomial_solver_utils import (
     is_permutation_matrix,
 )
 from verify_assumption_2 import (
+    extension_field,
     project_matrix_to_binary,
     random_invertible_matrix,
     random_permutation_matrix,
@@ -131,7 +132,7 @@ def main():
 
     random.seed(args.seed)
     set_random_seed(args.seed)
-    field = GF(2**args.nu, name=f"z{args.nu}")
+    field = extension_field(args.nu)
     print(
         f"PCE case={case}, n={args.n}, k={args.k}, nu={args.nu}, "
         f"binary rows={binary_rows}"

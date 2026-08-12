@@ -1,6 +1,0 @@
-case,n,k,rate,nu,binary_rows,structural_kernel_dimension,target_rank,source,instances,probability_deficiency_zero,probability_deficiency_at_most_log2_n,mean_deficiency,median_deficiency,p95_deficiency,p99_deficiency,max_deficiency,mean_kernel_dimension,max_kernel_dimension
-self_orthogonal,24,8,0.3333333333333333,5,640,25,551,pep_derived,100,1.0,1.0,0,0.0,0,0,0,25,25
-self_orthogonal,30,10,0.3333333333333333,5,1000,31,869,pep_derived,100,1.0,1.0,0,0.0,0,0,0,31,31
-self_orthogonal,36,12,0.3333333333333333,5,1440,37,1259,pep_derived,100,1.0,1.0,0,0.0,0,0,0,37,37
-self_orthogonal,48,16,0.3333333333333333,5,2560,49,2255,pep_derived,100,1.0,1.0,0,0.0,0,0,0,49,49
-self_orthogonal,60,20,0.3333333333333333,5,4000,61,3539,pep_derived,100,1.0,1.0,0,0.0,0,0,0,61,61
