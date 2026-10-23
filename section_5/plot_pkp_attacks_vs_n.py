@@ -50,6 +50,9 @@ def main() -> None:
     parser.add_argument("--n-step", type=int, default=1)
     parser.add_argument("--nu", type=int, default=11, help="q=2^nu")
     parser.add_argument("--ell", type=int, default=1)
+    parser.add_argument("--profile-samples", type=int, default=100)
+    parser.add_argument("--profile-seed", type=int, default=1)
+    parser.add_argument("--out-dat", type=Path, help="PGFPlots table")
     parser.add_argument(
         "--out-csv",
         type=Path,
@@ -66,7 +69,7 @@ def main() -> None:
 
     if args.n_min <= 0 or args.n_min > args.n_max:
         parser.error("require 0 < n_min <= n_max")
-    if args.n_step <= 0 or args.nu <= 0 or args.ell <= 0:
+    if args.n_step <= 0 or args.nu <= 0 or args.ell <= 0 or args.profile_samples < 1:
         parser.error("n_step, nu, and ell must be positive")
 
     out_csv = args.out_csv or Path(
@@ -91,6 +94,8 @@ def main() -> None:
         "esser_santini_log2_smooth",
         "psd_log2_exact_padded",
         "psd_log2_asymptotic",
+        "speck_log2", "random_guess_log2", "speck_min_log2", "speck_max_log2",
+        "profile_samples", "profile_seed",
     ]
     rows = []
 
@@ -114,7 +119,7 @@ def main() -> None:
             ):
                 raise AssertionError("selected K is not maximal")
 
-            point = compute_point(n, k, args.ell, args.nu)
+            point = compute_point(n, k, args.ell, args.nu, args.profile_samples, args.profile_seed)
             row = {
                 "N": n,
                 "K": k,
@@ -127,6 +132,12 @@ def main() -> None:
                 "esser_santini_log2_smooth": point.es_log2_smooth,
                 "psd_log2_exact_padded": point.psd_log2_exact,
                 "psd_log2_asymptotic": point.psd_log2_asymptotic,
+                "speck_log2": point.speck_log2,
+                "random_guess_log2": point.random_guess_log2,
+                "speck_min_log2": point.speck_min_log2,
+                "speck_max_log2": point.speck_max_log2,
+                "profile_samples": args.profile_samples,
+                "profile_seed": args.profile_seed,
             }
             writer.writerow(row)
             rows.append(row)
@@ -134,17 +145,25 @@ def main() -> None:
             print(
                 f"N={n:3d} K={k:3d} N-K={codimension:3d} "
                 f"log2(E[S])={log2_expected:8.4f} | "
-                f"KMP={point.kmp_log2:10.4f} "
+                f"KMP(SPECK)={point.speck_log2:10.4f} "
                 f"ES={point.es_log2_exact:10.4f} "
                 f"PSD_exact={point.psd_log2_exact:10.4f} "
                 f"PSD_asym={point.psd_log2_asymptotic:10.4f}"
             )
 
+    if args.out_dat:
+        args.out_dat.parent.mkdir(parents=True, exist_ok=True)
+        with args.out_dat.open("w") as handle:
+            handle.write("N kmp es psd speck random_guess\n")
+            for row in rows:
+                handle.write("%d %.6f %.6f %.6f %.6f %.6f\n" % (
+                    row['N'], row['kmp_log2'], row['esser_santini_log2_exact_two_size'],
+                    row['psd_log2_asymptotic'], row['speck_log2'], row['random_guess_log2']))
     ns = [row["N"] for row in rows]
     plt.figure(figsize=(10, 6))
     plt.plot(
         ns,
-        [row["kmp_log2"] for row in rows],
+        [r['speck_log2'] for r in rows],
         color="#6F9CC5",
         linewidth=2.2,
         label="KMP",
