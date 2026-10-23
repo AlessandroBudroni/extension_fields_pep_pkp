@@ -93,39 +93,11 @@ Matplotlib; `kmp.py` and `psd_attack_complexities.py` are shared helper modules.
 
 ### Multiplicity-aware KMP comparison (SPECK)
 
-Both plots show **KMP (the SPECK variant), ES and PSD**. The old KMP estimator
-and random-guessing estimates remain available in the API and exported data for
-diagnostics, but are not plotted. ES and PSD values are unchanged. The scalar-PKP estimator
-implements SPECK (ePrint 2025/923), Proposition 2 and Section 6.2, Lemma 2:
-
-- For input symbol counts `m`, count distinct partial arrangements `A_t(m)`
-  exactly by integer dynamic programming.
-- Estimate the number of distinct solution vectors as
-  `S = 1 + (A_n(m)-1)/q^(n-k)`.
-- For each matching length `t=1,...,n-k`, split `k+t` positions into two
-  balanced parts, reduce both arrangement lists by `sqrt(S)`, and estimate
-  their creation and collision costs. The plotted exponent is the minimum
-  over `t` of the maximum of these three terms. The API also returns the
-  log of their sum, as in Lemma 2. Reduced list sizes are bounded below by one
-  at exponent precision. These are heuristic estimates, not measured timings.
-- Random guessing costs `A_n(m)/S` trials in the same model. In a dense
-  solution regime this reproduces `q^(n-k)`, e.g. `2^54` for `(64,37,4)`.
-
-Since the plots specify parameters rather than an input vector, the KMP curve
-shows the **arithmetic mean estimated work** over 100 uniformly sampled nonzero
-vectors, with seed 1. This is `log2(mean(T))`, not `mean(log2(T))`. Every vector
-is treated as a separate fixed input: no favorable-codeword selection or
-resampling attack is included. Adjust with `--profile-samples` and
-`--profile-seed`. CSV files also record the minimum and maximum sampled SPECK
+Both plots show **KMP (the SPECK variant - ePrint 2025/923), ES and PSD**
+The KMP curve shows the **arithmetic mean estimated work** over 100 uniformly sampled nonzero
+vectors, with seed 1. CSV files record the minimum and maximum sampled SPECK
 exponents and the sampling settings. The ES/PSD curves keep their original
-solution-count models; this addition does not validate their independence
-assumptions in the repeated-entry regime.
-
-The SPECK formula currently supports `ell=1`; other `ell` values produce
-`nan` for this estimate and no KMP curve, rather than an unsupported
-multidimensional extrapolation. The legacy KMP estimates are still exported.
-
-For an exact supplied profile, use the Python API (no averaging):
+solution-count models.
 
 ```python
 from kmp import speck_complexity
@@ -156,16 +128,4 @@ python3 plot_pkp_attacks_vs_n.py \
   --out-csv data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.csv \
   --out-png data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.png \
   --out-dat data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.dat
-```
-
-The `.dat` columns are `nu` (or `N`), `kmp`, `es`, `psd`, `speck`, and
-`random_guess`. Copy the first table to
-`figures/data/pkp_complexity_N64_K37_L1.txt` and the second to
-`figures/data/pkp_complexity_q11_vs_n.txt` in the LaTeX project. The new
-PGFPlots KMP curve uses `speck`; `kmp` and `random_guess` are retained only as diagnostics.
-
-Run the exact small-instance checks with:
-
-```sh
-python3 -m unittest discover -s . -p test_kmp.py -v
 ```
