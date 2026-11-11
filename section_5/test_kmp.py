@@ -3,7 +3,7 @@ import math
 import unittest
 from fractions import Fraction
 from kmp import kmp_complexity, components_log2
-from plot_pkp_attacks_vs_n import largest_k_below_one
+from comparison_estimates import baseline_log2_costs, largest_k_below_one
 
 
 def exact_terms(n,r,ell,q,u,v):
@@ -28,6 +28,12 @@ class KmpEstimatorTests(unittest.TestCase):
     def test_paper_parameters(self):
         self.assertAlmostEqual(kmp_complexity(64,27,1,2**33)[1],120.6924037809325)
         self.assertAlmostEqual(kmp_complexity(64,27,1,2**11)[1],143.51298200194614)
+
+    def test_regular_isd_baseline(self):
+        # At N=20,K=14,nu=11, six blocks retain 5 positions and fourteen
+        # retain 4. Their independent support probability is (5/20)^6*(4/20)^14.
+        _,es=baseline_log2_costs(20,14,1,11)
+        self.assertAlmostEqual(es,12+14*math.log2(5))
 
     def test_additional_solution_parameter_selection(self):
         self.assertEqual(largest_k_below_one(2,1,1),1)
