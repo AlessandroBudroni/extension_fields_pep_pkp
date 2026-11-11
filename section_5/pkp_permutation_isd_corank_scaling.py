@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the PKP-to-PSD corank experiment over growing N at fixed nu."""
+"""Run equal-group rank checks (Section 5.2) over growing N at fixed nu."""
 
 import argparse
 import csv

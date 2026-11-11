@@ -1,94 +1,6 @@
 #!/usr/bin/env python3
+""" r is the codimension n-k."""
 import math
-import random
-from collections import Counter
-from functools import lru_cache
-
-
-@lru_cache(maxsize=512)
-def arrangement_counts(multiplicities):
-    """Exact counts of distinct ordered partial arrangements, for every length.
-
-    Appending j copies of a new symbol to a length-t word gives
-    binom(t+j,j) interleavings. Zero multiplicities may be omitted.
-    """
-    if not multiplicities or any(not isinstance(m, int) or m <= 0
-                                 for m in multiplicities):
-        raise ValueError("multiplicities must be positive integers")
-    counts = [1]
-    for m in multiplicities:
-        updated = [0] * (len(counts) + m)
-        for t, count in enumerate(counts):
-            for j in range(m + 1):
-                updated[t + j] += math.comb(t + j, j) * count
-        counts = updated
-    return tuple(counts)
-
-
-def speck_complexity(n, k, q, multiplicities):
-    """SPECK (2025/923), Prop. 2 and Sec. 6.2, Lemma 2; scalar PKP only.
-
-    k is the CODE DIMENSION, unlike the legacy plot calls to kmp_complexity.
-    Counts distinct permuted vectors, not permutations of repeated symbols.
-    No favorable-codeword sampling. The solution count and collision model
-    are heuristic. Reduced lists are floored at one at exponent precision.
-    Both the sum in Lemma 2 and its polynomial-factor-suppressed maximum
-    are returned; optimization uses the latter to match the paper plots.
-    """
-    multiplicities = tuple(sorted(multiplicities))
-    if n <= 0 or not 0 <= k < n or q < 2 or sum(multiplicities) != n:
-        raise ValueError("require n>0, 0<=k<n, q>=2 and multiplicities summing to n")
-    if len(multiplicities) > q:
-        raise ValueError("more distinct symbols than field elements")
-    counts = arrangement_counts(multiplicities)
-    log_m = math.log2(counts[n])
-    checks = (n - k) * math.log2(q)
-    # 1 + (M-1)/q^(n-k), evaluated without constructing tiny floats.
-    log_s = (log2sumexp([0.0, math.log2(counts[n] - 1) - checks])
-             if counts[n] > 1 else 0.0)
-    best = None
-    for t in range(1, n - k + 1):
-        u1 = (k + t) // 2
-        u2 = k + t - u1
-        a = max(0.0, math.log2(counts[u1]) - log_s / 2)
-        b = max(0.0, math.log2(counts[u2]) - log_s / 2)
-        collision = a + b - t * math.log2(q)
-        exponent = max(a, b, collision)
-        result = dict(best_log2_T=exponent, total_log2_T=log2sumexp([a, b, collision]),
-                      matching_symbols=t, u1=u1, u2=u2,
-                      L1_log2=a, L2_log2=b, collisions_log2=collision)
-        if best is None or exponent < best['best_log2_T']:
-            best = result
-    best.update(log2_solutions=log_s, log2_arrangements=log_m,
-                random_guess_log2=max(0.0, log_m - log_s),
-                multiplicities=multiplicities)
-    return best
-
-
-def speck_random_profile_complexity(n, k, q, samples=100, seed=1):
-    """Arithmetic mean work over uniform nonzero input vectors, in log2.
-
-    Samples describe an ensemble of fixed inputs; they are NOT attacker
-    retries and the cheapest profile is never selected. Fixed seeds make
-    the plot reproducible. No finite-field arithmetic is needed for counts.
-    """
-    if samples < 1 or n < 1 or q < 2 or not 0 <= k < n:
-        raise ValueError("invalid parameters or sample count")
-    rng = random.Random(f"{seed}:{n}:{k}:{q}")
-    results = []
-    for _ in range(samples):
-        while True:
-            vector = [rng.randrange(q) for _ in range(n)]
-            if any(vector):
-                break
-        profile = tuple(sorted(Counter(vector).values()))
-        results.append(speck_complexity(n, k, q, profile))
-    costs = [r['best_log2_T'] for r in results]
-    guesses = [r['random_guess_log2'] for r in results]
-    return dict(best_log2_T=log2sumexp(costs) - math.log2(samples),
-                random_guess_log2=log2sumexp(guesses) - math.log2(samples),
-                min_log2_T=min(costs), max_log2_T=max(costs), samples=samples,
-                seed=seed)
 
 # =========================
 # Helpers: primes & powers
@@ -301,25 +213,11 @@ if __name__ == "__main__":
     import argparse, json
     parser = argparse.ArgumentParser(description="Compute the complexity of KMP.")
     parser.add_argument("n", type=int, help="Code length n")
-    parser.add_argument("r", type=int, help="legacy CLI parameter n-k-1 (the API uses n-k)")
+    parser.add_argument("r", type=int, help="CLI parameter n-k-1 (the API uses n-k)")
     parser.add_argument("l", type=int, help="Parameter l")
     parser.add_argument("q", type=int, help="Field size q")
     parser.add_argument("--all-min", action="store_true",
                         help="List all (u1,u2) that are tied (within ~1e-6 in log2 T) for minimum.")
-    parser.add_argument("--speck", action="store_true", help="also estimate scalar PKP using SPECK")
-    parser.add_argument("--multiplicities", type=int, nargs="+", help="exact positive symbol counts")
-    parser.add_argument("--samples", type=int, default=100)
-    parser.add_argument("--seed", type=int, default=1)
     args = parser.parse_args()
 
     res = kmp_complexity(args.n, args.r+1, args.l, args.q, list_all_min=args.all_min, debug=True)
-    if args.speck:
-        if args.l != 1:
-            parser.error("SPECK estimation currently supports l=1 only")
-        # Legacy CLI uses n-k+1, and adds one above; keep that behavior intact.
-        k = args.n - args.r - 1
-        estimate = (speck_complexity(args.n, k, args.q, args.multiplicities)
-                    if args.multiplicities else
-                    speck_random_profile_complexity(args.n, k, args.q, args.samples, args.seed))
-        print("SPECK (dimension k=%d):" % k)
-        print(json.dumps(estimate, indent=2))

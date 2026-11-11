@@ -1,5 +1,5 @@
 #!/usr/bin/env sage
-"""Compare rank profiles of PKP-derived and uniform-random PSD matrices."""
+"""Rank checks for the equal-group construction of Section 5.2."""
 
 import argparse
 import csv

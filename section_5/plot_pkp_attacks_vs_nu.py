@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Compare PKP attacks using the padded two-size PSD partition formula."""
+"""Auxiliary two-size PSD partition estimates versus field degree.
+
+For the Section 5.3 comparison, use plot_counted_grouping_comparison.py."""
 
 import argparse
 import csv
@@ -17,10 +19,11 @@ import matplotlib.pyplot as plt
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from kmp import kmp_complexity, speck_random_profile_complexity  # noqa: E402
+from kmp import kmp_complexity  # noqa: E402
 from psd_attack_complexities import (  # noqa: E402
     esser_santini_psd_log2_complexity,
     log2_gamma_factorial,
+    padded_partition_log2_numerator,
 )
 
 
@@ -46,10 +49,6 @@ class Point:
     log2_partition_numerator: float
     log2_partition_numerator_asymptotic: float
     kmp_log2: float
-    speck_log2: float
-    random_guess_log2: float
-    speck_min_log2: float
-    speck_max_log2: float
     es_log2_exact: float
     es_log2_smooth: float
     psd_log2_exact: float
@@ -76,7 +75,11 @@ def padded_partition_psd_log2(
     float,
 ]:
     """
-    Return the modeled PSD work factor from the two-size construction.
+    Return the two-size partition trial estimate and Brégman–Minc reference.
+
+    The ``exact`` fields evaluate the integer factorial product;
+    they are trial estimates, not exact attack running times. The asymptotic
+    fields are diagnostic only and are not plotted or exported as ``psd``.
 
     The binary PSD instance has dimension
         k_psd = N^2 - (N-K)*ell*nu.
@@ -114,11 +117,8 @@ def padded_partition_psd_log2(
     if retained != n_psd - k_prime:
         raise AssertionError("two-size retained-column count is inconsistent")
 
-    log2_partition_numerator = (
-        q0 * log2_gamma_factorial(r0)
-        + log2_gamma_factorial(s0)
-        + q1 * log2_gamma_factorial(r1)
-        + log2_gamma_factorial(s1)
+    log2_partition_numerator = padded_partition_log2_numerator(
+        original_n, k_prime
     )
     log2_partition_numerator_asymptotic = (
         ((original_n - b) / r0) * log2_gamma_factorial(r0)
@@ -158,7 +158,6 @@ def padded_partition_psd_log2(
 
 def compute_point(
     original_n: int, original_k: int, ell: int, nu: int,
-    profile_samples: int = 100, profile_seed: int = 1,
 ) -> Point:
     codimension = original_n - original_k
     (
@@ -182,14 +181,6 @@ def compute_point(
     _, kmp_log2 = kmp_complexity(
         original_n, codimension, ell, 1 << nu, debug=False
     )
-    if ell == 1:
-        speck = speck_random_profile_complexity(
-            original_n, original_k, 1 << nu, profile_samples, profile_seed
-        )
-    else:
-        # Do not silently extrapolate the scalar SPECK model to multiple vectors.
-        speck = dict(best_log2_T=math.nan, random_guess_log2=math.nan,
-                     min_log2_T=math.nan, max_log2_T=math.nan)
     es_log2_smooth, _, es_k_eff = esser_santini_psd_log2_complexity(
         original_n * original_n, original_n, k_psd
     )
@@ -234,10 +225,6 @@ def compute_point(
             log2_partition_numerator_asymptotic
         ),
         kmp_log2=kmp_log2,
-        speck_log2=speck['best_log2_T'],
-        random_guess_log2=speck['random_guess_log2'],
-        speck_min_log2=speck['min_log2_T'],
-        speck_max_log2=speck['max_log2_T'],
         es_log2_exact=es_log2_exact,
         es_log2_smooth=es_log2_smooth,
         psd_log2_exact=psd_log2_exact,
@@ -249,7 +236,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Compare KMP, Esser--Santini, and the permutation-based PSD "
-            "attack using the padded two-size construction."
+            "two-size partition estimate."
         )
     )
     parser.add_argument("N", type=int, help="original PKP length")
@@ -259,8 +246,6 @@ def main() -> None:
     parser.add_argument("nu_max", type=int)
     parser.add_argument("--out-png", type=Path)
     parser.add_argument("--out-csv", type=Path)
-    parser.add_argument("--profile-samples", type=int, default=100)
-    parser.add_argument("--profile-seed", type=int, default=1)
     parser.add_argument("--out-dat", type=Path, help="PGFPlots table")
     args = parser.parse_args()
 
@@ -268,8 +253,8 @@ def main() -> None:
         parser.error("require N>0, 0<=K<N, and L>0")
     if args.nu_min > args.nu_max:
         parser.error("nu_min must not exceed nu_max")
-    if args.nu_min < 1 or args.profile_samples < 1:
-        parser.error("nu_min and profile-samples must be positive")
+    if args.nu_min < 1:
+        parser.error("nu_min must be positive")
 
     stem = (
         f"pkp_complexity_padded_N{args.N}_K{args.K}_L{args.L}_"
@@ -279,13 +264,13 @@ def main() -> None:
     out_csv = args.out_csv or Path(f"{stem}.csv")
 
     points = [
-        compute_point(args.N, args.K, args.L, nu, args.profile_samples, args.profile_seed)
+        compute_point(args.N, args.K, args.L, nu)
         for nu in range(args.nu_min, args.nu_max + 1)
     ]
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(
             [
                 "nu",
@@ -312,8 +297,6 @@ def main() -> None:
                 "esser_santini_log2_smooth",
                 "psd_log2_exact_padded",
                 "psd_log2_asymptotic",
-                "speck_log2", "random_guess_log2", "speck_min_log2", "speck_max_log2",
-                "profile_samples", "profile_seed",
             ]
         )
         for point in points:
@@ -343,25 +326,21 @@ def main() -> None:
                     point.es_log2_smooth,
                     point.psd_log2_exact,
                     point.psd_log2_asymptotic,
-                    point.speck_log2, point.random_guess_log2,
-                    point.speck_min_log2, point.speck_max_log2,
-                    args.profile_samples, args.profile_seed,
                 ]
             )
 
     if args.out_dat:
         args.out_dat.parent.mkdir(parents=True, exist_ok=True)
         with args.out_dat.open("w") as handle:
-            handle.write("nu kmp es psd speck random_guess\n")
+            handle.write("nu kmp es psd\n")
             for p in points:
                 handle.write(f"{p.nu} {p.kmp_log2:.6f} {p.es_log2_exact:.6f} "
-                             f"{p.psd_log2_asymptotic:.6f} {p.speck_log2:.6f} "
-                             f"{p.random_guess_log2:.6f}\n")
+                             f"{p.psd_log2_exact:.6f}\n")
     nus = [point.nu for point in points]
     plt.figure(figsize=(10, 6))
     plt.plot(
         nus,
-        [p.speck_log2 for p in points],
+        [p.kmp_log2 for p in points],
         color="#6F9CC5",
         linewidth=2.2,
         label="KMP",
@@ -376,10 +355,10 @@ def main() -> None:
     )
     plt.plot(
         nus,
-        [point.psd_log2_asymptotic for point in points],
+        [point.psd_log2_exact for point in points],
         color="#69B199",
         linewidth=2.2,
-        label="Permutation-based PSD",
+        label="PSD (two-size partition)",
     )
     plt.xlabel(r"$\nu$ ($q=2^\nu$)")
     plt.ylabel(r"$\log_2 T$")
@@ -399,7 +378,6 @@ def main() -> None:
             f"ES_r0={point.es_r0:3d} ES_r1={point.es_r1:3d} "
             f"(q0,s0)=({point.q0},{point.s0}) "
             f"(q1,s1)=({point.q1},{point.s1}) "
-            f"KMP(SPECK)={point.speck_log2:10.4f} "
             f"ES_exact={point.es_log2_exact:10.4f} "
             f"ES_smooth={point.es_log2_smooth:10.4f} "
             f"PSD_exact={point.psd_log2_exact:10.4f} "

@@ -19,7 +19,7 @@ def solution_count_log2(n: int, w: int, k: int) -> float:
     Compute log2(S) for
         S = max(1, w! * 2^{-(n-k)}).
 
-    This uses the original instance dimension k, as requested.
+    The parameter k is the dimension before adjoining permutation equations.
     """
     return max(log2_gamma_factorial(w) - (n - k), 0.0)
 
@@ -76,19 +76,31 @@ def esser_santini_psd_log2_complexity(n: int, w: int, k: int) -> tuple[float, fl
     return log2_t, log2_s, k_eff
 
 
-def psd_perm_isd_log2_complexity(n: int, w: int, k: int) -> tuple[float, float, int, float]:
+def padded_partition_log2_numerator(w: int, k_prime: int) -> float:
+    """Log2 of the factorial product for a two-size partition.
+
+    Empty block families contribute one. Padding can create extra successes,
+    so this product gives a lower bound on the success-probability numerator.
     """
-    Our permutation-based PSD complexity after adding 2w-1 permutation equations.
+    if w <= 0 or not 0 <= k_prime < w * w:
+        raise ValueError("require w > 0 and 0 <= k_prime < w^2")
+    a, b = divmod(k_prime, w)
+    total = 0.0
+    for count, retained in ((w - b, w - a), (b, w - a - 1)):
+        if count:
+            groups, remainder = divmod(count, retained)
+            total += (groups * log2_gamma_factorial(retained)
+                      + log2_gamma_factorial(remainder))
+    return total
 
-        T = O~( w! / (((w-v)!)^(w/(w-v)) * S) )
 
-    with
-        k_eff = k - (2w-1)
-        v = k_eff / w.
+def psd_perm_isd_log2_complexity(n: int, w: int, k: int) -> tuple[float, float, int, float]:
+    """Auxiliary two-size PSD partition trial estimate.
 
-    When v is not integral, we extend the factorial term using Gamma, which is
-    the natural analogue of how the Esser-Santini expression uses the effective
-    dimension directly without rounding.
+    Uses integer group sizes, remainder factorials, and the solution-count
+    estimate S. The optimized construction in Section 5.2 is implemented in
+    counted_grouping.py. The returned v=k_eff/w is the average information-set size
+    per block; no factorial is evaluated at a fractional retained size.
     """
     validate_psd_parameters(n, w, k)
 
@@ -96,19 +108,15 @@ def psd_perm_isd_log2_complexity(n: int, w: int, k: int) -> tuple[float, float, 
     if k_eff < 0:
         raise ValueError("k - (2w-1) must be non-negative")
 
-    v = k_eff / w
-    if v < 0 or v >= w:
-        raise ValueError("v = k_eff / w must satisfy 0 <= v < w")
-
     log2_s = solution_count_log2(n, w, k)
-    remaining = w - v
-    log2_t = log2_gamma_factorial(w) - (w / remaining) * log2_gamma_factorial(remaining) - log2_s
-    return log2_t, log2_s, k_eff, v
+    log2_t = (log2_gamma_factorial(w)
+              - padded_partition_log2_numerator(w, k_eff) - log2_s)
+    return log2_t, log2_s, k_eff, k_eff / w
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Compute Esser-Santini and permutation-based PSD attack complexities on a PSD instance."
+        description="Compute regular-ISD and two-size PSD partition estimates."
     )
     parser.add_argument("n", type=int, help="PSD length parameter n")
     parser.add_argument("w", type=int, help="PSD weight parameter w, with w^2 = n")
@@ -131,10 +139,10 @@ def main() -> None:
     print(f"v                    = {v:.12f}")
     print()
     print(f"Esser-Santini log2(T)= {es_log2_t:.12f}")
-    print(f"PSD attack log2(T)   = {psd_log2_t:.12f}")
+    print(f"PSD partition log2(T) estimate = {psd_log2_t:.12f}")
     print()
     print(f"Esser-Santini        ≈ 2^({es_log2_t:.6f})")
-    print(f"PSD attack           ≈ 2^({psd_log2_t:.6f})")
+    print(f"PSD partition estimate   ≈ 2^({psd_log2_t:.6f})")
 
 
 if __name__ == "__main__":

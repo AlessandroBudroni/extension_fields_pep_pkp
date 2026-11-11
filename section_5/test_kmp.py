@@ -1,57 +1,42 @@
-"""Small exact combinatorial checks for the SPECK estimator (stdlib only)."""
-import itertools
+"""Independent small exact checks of the original KMP estimator."""
 import math
 import unittest
-
-from kmp import arrangement_counts, speck_complexity, speck_random_profile_complexity
-
-
-class SpeckEstimatorTests(unittest.TestCase):
-    def test_arrangements_against_exhaustive_enumeration(self):
-        for profile in [(2, 2, 1), (3, 1), (1, 1, 1, 1)]:
-            vector = [i for i, m in enumerate(profile) for _ in range(m)]
-            expected = [len(set(itertools.permutations(vector, t)))
-                        for t in range(len(vector) + 1)]
-            self.assertEqual(arrangement_counts(profile), tuple(expected))
-
-    def test_speck_formula_and_optimization(self):
-        # Independently evaluate Prop. 2 / Lemma 2 using ordinary arithmetic.
-        profile = (2, 2, 1)
-        n, k, q = 5, 2, 4
-        counts = arrangement_counts(profile)
-        solutions = 1 + (counts[n] - 1) / q ** (n - k)
-        candidates = []
-        for t in range(1, n - k + 1):
-            u1 = (k + t) // 2
-            u2 = k + t - u1
-            a = max(1, counts[u1] / math.sqrt(solutions))
-            b = max(1, counts[u2] / math.sqrt(solutions))
-            candidates.append((math.log2(max(a, b, a*b/q**t)), t,
-                               math.log2(a+b+a*b/q**t)))
-        expected = min(candidates)
-        actual = speck_complexity(n, k, q, profile)
-        self.assertAlmostEqual(actual['best_log2_T'], expected[0])
-        self.assertEqual(actual['matching_symbols'], expected[1])
-        self.assertAlmostEqual(actual['total_log2_T'], expected[2])
-        self.assertAlmostEqual(actual['random_guess_log2'], math.log2(counts[n]/solutions))
-
-    def test_unique_solution_limit(self):
-        result = speck_complexity(6, 3, 2**100, (1,)*6)
-        self.assertLess(result['log2_solutions'], 1e-12)
-        self.assertAlmostEqual(result['best_log2_T'], math.log2(6*5))
-
-    def test_reproducibility_and_large_fields(self):
-        a = speck_random_profile_complexity(12, 6, 4, samples=8, seed=2)
-        self.assertEqual(a, speck_random_profile_complexity(12, 6, 4, samples=8, seed=2))
-        self.assertLessEqual(a['min_log2_T'], a['best_log2_T'])
-        self.assertLessEqual(a['best_log2_T'], a['max_log2_T'])
-        self.assertTrue(math.isfinite(speck_complexity(64, 37, 2**60, (1,)*64)['best_log2_T']))
-
-    def test_reject_invalid_profiles(self):
-        for profile in [(2, 2), (0, 5), (1,)*5]:
-            with self.assertRaises(ValueError):
-                speck_complexity(5, 2, 4, profile)
+from fractions import Fraction
+from kmp import kmp_complexity, components_log2
+from plot_pkp_attacks_vs_n import largest_k_below_one
 
 
-if __name__ == '__main__':
+def exact_terms(n,r,ell,q,u,v):
+    a=math.factorial(n)//math.factorial(n-u)
+    b=math.factorial(n)//math.factorial(n-v)
+    factor=Fraction(q)**(ell*(n-r-u-v))
+    return [Fraction(a),Fraction(b),a*b*factor,
+            Fraction(math.factorial(n)//math.factorial(n-u-v))*factor]
+
+
+class KmpEstimatorTests(unittest.TestCase):
+    def test_terms_against_exact_arithmetic(self):
+        actual=components_log2(7,1,3,2,3,4)
+        self.assertAlmostEqual(actual['T_log2'],math.log2(sum(exact_terms(7,3,1,4,2,3))))
+
+    def test_optimization_against_exhaustive_exact_cost(self):
+        for n,r,ell,q in [(5,2,1,4),(7,3,1,8),(6,3,2,4)]:
+            candidates=[sum(exact_terms(n,r,ell,q,u,v)) for u in range(n+1)
+                        for v in range(n-u+1) if u+v>=n-r+1]
+            self.assertAlmostEqual(kmp_complexity(n,r,ell,q)[1],math.log2(min(candidates)))
+
+    def test_paper_parameters(self):
+        self.assertAlmostEqual(kmp_complexity(64,27,1,2**33)[1],120.6924037809325)
+        self.assertAlmostEqual(kmp_complexity(64,27,1,2**11)[1],143.51298200194614)
+
+    def test_additional_solution_parameter_selection(self):
+        self.assertEqual(largest_k_below_one(2,1,1),1)
+        for n in [20,64,160]:
+            k=largest_k_below_one(n,11,1)
+            numerator=math.factorial(n)-1
+            self.assertLess(numerator,2**(11*(n-k)))
+            self.assertGreaterEqual(numerator,2**(11*(n-k-1)))
+
+
+if __name__=='__main__':
     unittest.main()

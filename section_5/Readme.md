@@ -1,131 +1,33 @@
 # Section 5 experiments
 
-## PKP-to-PSD corank experiment
+Requires Python 3 and Matplotlib. Rank experiments use a C compiler by default;
+pass `--backend python` to use the Python implementation.
 
-`pkp_permutation_isd_corank_experiment.py` compares the binary matrix derived
-from one PKP parameter set with a uniformly random binary matrix of the same
-dimensions. It measures
-
-- the invertibility probability `Pr[d(Q)=0]`;
-- the average enumeration cost `E[2^d(Q)]`;
-- the mean and maximum corank `d(Q)`.
-
-Run it with SageMath:
+## Section 5.3: rank statistics (Figure 1)
 
 ```sh
-sage pkp_permutation_isd_corank_experiment.py 64 32 1 13 \
-  --r 8 \
-  --instances 100 \
-  --partitions 200 \
-  --groupings adaptive \
-  --skip-compatible \
-  --seed 1
+python3 counted_rank_scaling.py --nu 13 \
+  --n-values 24 28 32 40 48 56 64 72 80 84 88 96 104 112 120 128 \
+  --instances 20 --partitions 100 --jobs 4 --seed 1 \
+  --out-dir data/counted_rank_scaling_nu13
+
+python3 counted_rank_scaling.py --nu 23 \
+  --n-values 24 36 48 52 60 72 84 96 104 108 120 \
+  --instances 20 --partitions 100 --jobs 4 --seed 1 \
+  --out-dir data/counted_rank_scaling_nu23
 ```
 
-The positional arguments are `N`, `K`, `ell`, and `nu`, with `q=2^nu`.
+Outputs include CSV summaries, PGFPlots tables, PNG plots, raw ranks, and
+records of whether independent source groups were found.
 
-## Corank scaling at fixed field size
-
-`pkp_permutation_isd_corank_scaling.py` repeats the adaptive experiment for
-growing `N` at a fixed `nu` and code rate. Infeasible lengths, for which no
-admissible divisor `r` exists, are omitted automatically. Independent parameter
-sets are run in parallel.
-
-For the two experiments reported in the paper:
+## Section 5.3: attack comparison (Figure 2)
 
 ```sh
-python3 pkp_permutation_isd_corank_scaling.py \
-  --nu 13 \
-  --instances 20 \
-  --partitions 100 \
-  --jobs 4 \
-  --out-dir rank_scaling_nu13
-
-python3 pkp_permutation_isd_corank_scaling.py \
-  --nu 23 \
-  --instances 20 \
-  --partitions 100 \
-  --jobs 4 \
-  --out-dir rank_scaling_nu23
+python3 plot_counted_grouping_comparison.py \
+  --nu-min 11 --nu-max 60 --n-min 20 --n-max 160 --surplus 3 --out-dir data
 ```
 
-Each run produces:
+This compares KMP, Esser–Santini, and the construction of Section 5.2, implemented
+in `counted_grouping.py`. It writes CSV and PGFPlots tables and PNG plots.
 
-- a full aggregate CSV, including the selected `K` and `r` and the fraction of
-  instances for which an adaptive grouping was found;
-- a whitespace-separated `.dat` table ready for the paper's PGFPlots figure;
-- PNG previews of `Pr[d(Q)=0]` and `E[2^d(Q)]`;
-- per-parameter raw data, summaries, rank diagnostics, and logs under `runs/`.
-
-The defaults are `K/N=1/2`, `ell=1`, and `20 <= N <= 128`. Use `--n-values` to
-request an explicit list of lengths.
-
-## Complexity comparison with KMP
-
-`plot_pkp_attacks_vs_nu.py` compares KMP, Esser--Santini, and the
-permutation-based PSD attack for fixed PKP parameters and growing field size.
-The Esser--Santini baseline applies regular ISD directly to the PSD instance
-obtained from the PKP-to-PSD transformation:
-
-```sh
-python3 plot_pkp_attacks_vs_nu.py 64 37 1 2 60 \
-  --out-csv data/comparison_N64_K37_L1_nu2to60.csv \
-  --out-png data/comparison_N64_K37_L1_nu2to60.png
-```
-
-`plot_pkp_attacks_vs_n.py` fixes `q=2^11` and `ell=1`, lets `N` grow from 20 to
-160, and selects the largest `K` for which the expected number of PKP solutions
-is below one:
-
-```sh
-python3 plot_pkp_attacks_vs_n.py \
-  --n-min 20 \
-  --n-max 160 \
-  --n-step 1 \
-  --nu 11 \
-  --ell 1 \
-  --out-csv data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.csv \
-  --out-png data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.png
-```
-
-Both commands output a CSV file and a PNG preview. They require Python 3 and
-Matplotlib; `kmp.py` and `psd_attack_complexities.py` are shared helper modules.
-
-### Multiplicity-aware KMP comparison (SPECK)
-
-Both plots show **KMP (the SPECK variant - ePrint 2025/923), ES and PSD**
-The KMP curve shows the **arithmetic mean estimated work** over 100 uniformly sampled nonzero
-vectors, with seed 1. CSV files record the minimum and maximum sampled SPECK
-exponents and the sampling settings. The ES/PSD curves keep their original
-solution-count models.
-
-```python
-from kmp import speck_complexity
-estimate = speck_complexity(n=64, k=37, q=4, multiplicities=(16, 16, 16, 16))
-print(estimate)
-```
-
-`k` here is the code dimension. The legacy `kmp_complexity(n,r,l,q)` API uses
-`r=n-k`; its historical CLI adds one to its positional `r`, so that CLI expects
-`r=n-k-1`. Existing behavior is retained. For example:
-
-```sh
-python3 kmp.py 64 26 1 4 --speck --multiplicities 16 16 16 16
-```
-
-To regenerate the data and previews with the SPECK variant of KMP, and export tables
-for the separately formatted TikZ figure, run from this directory:
-
-```sh
-python3 plot_pkp_attacks_vs_nu.py 64 37 1 2 60 \
-  --profile-samples 100 --profile-seed 1 \
-  --out-csv data/comparison_N64_K37_L1_nu2to60.csv \
-  --out-png data/comparison_N64_K37_L1_nu2to60.png \
-  --out-dat data/comparison_N64_K37_L1_nu2to60.dat
-
-python3 plot_pkp_attacks_vs_n.py \
-  --profile-samples 100 --profile-seed 1 \
-  --out-csv data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.csv \
-  --out-png data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.png \
-  --out-dat data/pkp_attacks_vs_n_N20to160_step1_q2pow11_ell1.dat
-```
+Run checks with `python3 -m unittest discover -v`.
